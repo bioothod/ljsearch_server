@@ -25,6 +25,7 @@ type Page struct {
 type Document struct {
 	Id		string				`json:"id"`
 	Author		string				`json:"author"`
+	Title		string				`json:"title"`
 	Content		Page				`json:"content"`
 	Timestamp	time.Time			`json:"-"`
 }
@@ -249,6 +250,7 @@ func main() {
 
 		docs := make([]Document, 0, len(res.Docs))
 		for _, doc := range res.Docs {
+			doc.Title = strings.Join(doc.Content.Title, " ")
 			doc.Content.Content = high(doc.Content.Content)
 			doc.Content.Title = high(doc.Content.Title)
 
