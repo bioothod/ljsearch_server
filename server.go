@@ -189,6 +189,7 @@ func main() {
 		high := func(content []string) ([]string) {
 			type chunk struct {
 				start, end int
+				high []int
 			}
 			last_indexed_end := -1
 			off := 5
@@ -208,14 +209,17 @@ func main() {
 							end = len(content)
 						}
 
-						ch := &chunk {
-							start: start,
-							end: end,
-						}
-
 						if len(indexes) > 0 && start <= last_indexed_end {
-							indexes[len(indexes) - 1].end = end
+							ch := indexes[len(indexes) - 1]
+							ch.end = end
+							ch.high = append(ch.high, idx)
 						} else {
+							ch := &chunk {
+								start: start,
+								end: end,
+								high: []int{idx},
+							}
+
 							indexes[len(indexes)] = ch
 						}
 
@@ -226,7 +230,17 @@ func main() {
 
 			ret := make([]string, 0, len(indexes))
 			for _, ch := range indexes {
-				ret = append(ret, content[ch.start : ch.end]...)
+				for idx := ch.start; idx < ch.end; idx++ {
+					t := content[idx]
+					for _, h := range ch.high {
+						if idx == h {
+							t = "<high>" + t + "</high>"
+						}
+					}
+
+					ret = append(ret, t)
+				}
+
 				ret = append(ret, "...")
 			}
 
