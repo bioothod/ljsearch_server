@@ -197,8 +197,12 @@ func main() {
 
 			indexes := make(map[int]*chunk)
 			for idx, w := range content {
-				stemmed := Stem(w)
 				for _, q := range qwords_stemmed {
+					if !strings.Contains(w, q) {
+						continue
+					}
+
+					stemmed := Stem(w)
 					if stemmed == q {
 						start := idx - off
 						if start < 0 {
@@ -236,6 +240,7 @@ func main() {
 					for _, h := range ch.high {
 						if idx == h {
 							t = "<high>" + t + "</high>"
+							break
 						}
 					}
 
