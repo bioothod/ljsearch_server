@@ -8,6 +8,7 @@ import (
 	"github.com/bioothod/apparat/services/common"
 	"github.com/gin-gonic/contrib/static"
 	"github.com/gin-gonic/gin"
+	"github.com/golang/glog"
 	"log"
 	"net/http"
 	"os"
@@ -139,6 +140,8 @@ func main() {
 	r.Use(static.Serve("/", static.LocalFile(*static_dir, false)))
 
 	r.POST("/search", func (c *gin.Context) {
+		start_time := time.Now()
+
 		var req SearchRequest
 		err := c.BindJSON(&req)
 		if err != nil {
@@ -175,6 +178,7 @@ func main() {
 			qwords_stemmed = append(qwords_stemmed, content.StemmedText...)
 		}
 
+		search_start_time := time.Now()
 		res, err := searcher.Search(&mreq)
 		if err != nil {
 			estr := fmt.Sprintf("search failed: %v", err)
@@ -198,7 +202,7 @@ func main() {
 			indexes := make(map[int]*chunk)
 			for idx, w := range content {
 				for _, q := range qwords_stemmed {
-					if !strings.Contains(w, q) {
+					if !strings.HasPrefix(w, q) {
 						continue
 					}
 
@@ -253,6 +257,7 @@ func main() {
 			return ret
 		}
 
+		postprocessing_start_time := time.Now()
 		docs := make([]Document, 0, len(res.Docs))
 		for _, doc := range res.Docs {
 			doc.Title = strings.Join(doc.Content.Title, " ")
@@ -263,6 +268,21 @@ func main() {
 		}
 
 		res.Docs = docs
+
+		completion_time := time.Now()
+
+		clientIP := c.ClientIP()
+		xreq := c.Request.Header.Get(middleware.XRequestHeader)
+
+		glog.Infof("search: xreq: %s, client: %s, request: %+v, latencies: prepare: %s, search: %s, postprocessing: %s",
+			xreq,
+			clientIP,
+			mreq,
+			search_start_time.Sub(start_time).String(),
+			postprocessing_start_time.Sub(search_start_time).String(),
+			completion_time.Sub(postprocessing_start_time),
+		)
+
 
 		c.JSON(http.StatusOK, res)
 
