@@ -1,4 +1,4 @@
-FROM reverbrain/trusty-dev
+FROM bioothod/ljsearch_server
 
 #RUN	echo "deb http://repo.reverbrain.com/trusty/ current/amd64/" > /etc/apt/sources.list.d/reverbrain.list && \
 #	echo "deb http://repo.reverbrain.com/trusty/ current/all/" >> /etc/apt/sources.list.d/reverbrain.list && \
@@ -10,11 +10,11 @@ FROM reverbrain/trusty-dev
 #	cp -f /usr/share/zoneinfo/posix/W-SU /etc/localtime && \
 #	echo Europe/Moscow > /etc/timezeone
 
-RUN	VERSION=go1.6.3 && \
-	curl -O https://storage.googleapis.com/golang/$VERSION.linux-amd64.tar.gz && \
-	rm -rf /usr/local/go && \
-	tar -C /usr/local -xf $VERSION.linux-amd64.tar.gz && \
-	rm -f $VERSION.linux-amd64.tar.gz
+#RUN	VERSION=go1.6.3 && \
+#	curl -O https://storage.googleapis.com/golang/$VERSION.linux-amd64.tar.gz && \
+#	rm -rf /usr/local/go && \
+#	tar -C /usr/local -xf $VERSION.linux-amd64.tar.gz && \
+#	rm -f $VERSION.linux-amd64.tar.gz
 
 RUN	git config --global user.email "zbr@ioremap.net" && \
 	git config --global user.name "Evgeniy Polyakov" && \
