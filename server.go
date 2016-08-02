@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/contrib/static"
 	"github.com/gin-gonic/gin"
 	"github.com/golang/glog"
+	"github.com/reverbrain/warp/bindings/go/warp"
 	"log"
 	"net/http"
 	"os"
@@ -25,6 +26,7 @@ type Page struct {
 
 type Document struct {
 	Id		string				`json:"id"`
+	IndexedId	int64				`json:"indexed_id"`
 	Author		string				`json:"author"`
 	Title		string				`json:"title"`
 	Content		Page				`json:"content"`
@@ -72,12 +74,20 @@ func (d *Document) UnmarshalJSON(data []byte) (err error) {
 
 type SearchResults struct {
 	Mbox		string				`json:"mailbox"`
+	Completed	bool				`json:"completed"`
+	NextDocumentId	int64				`json:"next_document_id"`
 	Docs		[]Document			`json:"ids"`
+}
+
+type Paging struct {
+	MaxNumber	int64				`json:"max_number"`
+	NextDocumentId	int64				`json:"next_document_id"`
 }
 
 type SearchRequest struct {
 	Mbox		string				`json:"mailbox"`
 	Query		map[string]string		`json:"query"`
+	Paging		Paging				`json:"paging"`
 }
 
 type Searcher interface {
@@ -105,6 +115,7 @@ func static_index_handler(root string) gin.HandlerFunc {
 func main() {
 	addr := flag.String("addr", "", "address to listen auth server at")
 	greylock_addr := flag.String("greylock", "", "greylock searching server")
+	warp_addr := flag.String("warp", "", "warp lexical processing server")
 	static_dir := flag.String("static", "", "directory for static content")
 
 	flag.Parse()
@@ -115,6 +126,9 @@ func main() {
 		log.Fatalf("You must provide static content directory\n")
 	}
 
+	if *warp_addr == "" {
+		log.Fatalf("You must provide warp server address:port\n")
+	}
 	if *greylock_addr == "" {
 		log.Fatalf("You must provide greylock server address:port\n")
 	}
@@ -124,6 +138,10 @@ func main() {
 		log.Fatalf("Could not create greylock searcher: %v\n", err)
 	}
 
+	lp, err := warp.NewEngine(*warp_addr)
+	if err != nil {
+		log.Fatalf("Could not create warp lexical processor: %v\n", err)
+	}
 
 	r := gin.New()
 	r.Use(middleware.XTrace())
@@ -155,27 +173,34 @@ func main() {
 			return
 		}
 
-		var mreq SearchRequest
-		mreq.Mbox = req.Mbox
-		mreq.Query = make(map[string]string)
+		wr := warp.CreateRequest()
+		for k, v := range req.Query {
+			wr.Insert(k, v)
+		}
+		wr.WantStem = true
+
+		wresp, err := lp.Convert(wr)
+		if err != nil {
+			estr := fmt.Sprintf("warp failed: %v", err)
+			common.NewErrorString(c, "search", estr)
+
+			c.JSON(http.StatusBadRequest, gin.H {
+				"operation": "search",
+				"error": estr,
+			})
+			return
+		}
 
 		qwords_stemmed := make([]string, 0)
-		for k, v := range req.Query {
-			reader := strings.NewReader(v)
-			content, err := Parse(reader)
-			if err != nil {
-				estr := fmt.Sprintf("cound not parse search request query: '%s', error: %v", v, err)
-				common.NewErrorString(c, "search", estr)
 
-				c.JSON(http.StatusBadRequest, gin.H {
-					"operation": "search",
-					"error": estr,
-				})
-				return
-			}
+		var mreq SearchRequest
+		mreq.Mbox = req.Mbox
+		mreq.Paging = req.Paging
+		mreq.Query = make(map[string]string)
 
-			mreq.Query[k] = strings.Join(content.StemmedText, " ")
-			qwords_stemmed = append(qwords_stemmed, content.StemmedText...)
+		for k, v := range wresp {
+			mreq.Query[k] = v.Stem
+			qwords_stemmed = append(qwords_stemmed, strings.Split(v.Stem, " ")...)
 		}
 
 		search_start_time := time.Now()

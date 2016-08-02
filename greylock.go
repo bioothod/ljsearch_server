@@ -31,7 +31,7 @@ func NewGreylockSearcher(addr string) (Searcher, error) {
 }
 
 func (s *GreylockSearcher) Search(req *SearchRequest) (*SearchResults, error) {
-	req_packed, err := json.Marshal(&req)
+	req_packed, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("cound not marshal greylock request: %+v, error: %v", req, err)
 	}
