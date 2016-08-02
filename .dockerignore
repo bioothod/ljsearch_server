@@ -1,0 +1,10 @@
+build
+**/*.sw*
+**/*~
+**/*.o
+**/*.a
+**/*.so
+*.html*
+tags
+*_server
+db
