@@ -200,7 +200,11 @@ func main() {
 
 		for k, v := range wresp {
 			mreq.Query[k] = v.Stem
-			qwords_stemmed = append(qwords_stemmed, strings.Split(v.Stem, " ")...)
+			for _, s := range strings.Split(v.Stem, " ") {
+				if len(s) != 0 {
+					qwords_stemmed = append(qwords_stemmed, s)
+				}
+			}
 		}
 
 		search_start_time := time.Now()
@@ -231,37 +235,35 @@ func main() {
 						continue
 					}
 
-					stemmed := Stem(w)
-					if stemmed == q {
-						start := idx - off
-						if start < 0 {
-							start = 0
-						}
-
-						end := idx + off
-						if end > len(content) {
-							end = len(content)
-						}
-
-						if len(indexes) > 0 && start <= last_indexed_end {
-							ch := indexes[len(indexes) - 1]
-							ch.end = end
-							ch.high = append(ch.high, idx)
-						} else {
-							ch := &chunk {
-								start: start,
-								end: end,
-								high: []int{idx},
-							}
-
-							indexes[len(indexes)] = ch
-						}
-
-						last_indexed_end = end
+					start := idx - off
+					if start < 0 {
+						start = 0
 					}
+
+					end := idx + off
+					if end > len(content) {
+						end = len(content)
+					}
+
+					if len(indexes) > 0 && start <= last_indexed_end {
+						ch := indexes[len(indexes) - 1]
+						ch.end = end
+						ch.high = append(ch.high, idx)
+					} else {
+						ch := &chunk {
+							start: start,
+							end: end,
+							high: []int{idx},
+						}
+
+						indexes[len(indexes)] = ch
+					}
+
+					last_indexed_end = end
 				}
 			}
 
+			total_len := 0
 			ret := make([]string, 0, len(indexes))
 			for _, ch := range indexes {
 				for idx := ch.start; idx < ch.end; idx++ {
@@ -274,9 +276,13 @@ func main() {
 					}
 
 					ret = append(ret, t)
+					total_len += len(t)
 				}
 
 				ret = append(ret, "...")
+				if total_len > 256 {
+					break
+				}
 			}
 
 			return ret
