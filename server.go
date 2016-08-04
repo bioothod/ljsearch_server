@@ -86,6 +86,8 @@ type Paging struct {
 
 type SearchRequest struct {
 	Mbox		string				`json:"mailbox"`
+	Exact		map[string]string		`json:"exact"`
+	Negation	map[string]string		`json:"negation"`
 	Query		map[string]string		`json:"query"`
 	Paging		Paging				`json:"paging"`
 }
@@ -173,9 +175,23 @@ func main() {
 			return
 		}
 
+		qwords_stemmed := make([]string, 0)
+
+		var mreq SearchRequest
+		mreq.Mbox = req.Mbox
+		mreq.Paging = req.Paging
+		mreq.Query = make(map[string]string)
+		mreq.Exact = req.Exact
+		mreq.Negation = make(map[string]string)
+
+		negation_prefix := "negation_"
+
 		wr := warp.CreateRequest()
 		for k, v := range req.Query {
 			wr.Insert(k, v)
+		}
+		for k, v := range req.Negation {
+			wr.Insert(negation_prefix + k, v)
 		}
 		wr.WantStem = true
 
@@ -191,15 +207,19 @@ func main() {
 			return
 		}
 
-		qwords_stemmed := make([]string, 0)
+		for k, v := range wresp.Result {
+			if k == "urls" {
+				mreq.Query[k] = v.Text
+				continue
+			}
 
-		var mreq SearchRequest
-		mreq.Mbox = req.Mbox
-		mreq.Paging = req.Paging
-		mreq.Query = make(map[string]string)
+			if strings.HasPrefix(k, negation_prefix) {
+				k = strings.TrimPrefix(k, negation_prefix)
+				mreq.Negation[k] = v.Stem
+			} else {
+				mreq.Query[k] = v.Stem
+			}
 
-		for k, v := range wresp {
-			mreq.Query[k] = v.Stem
 			for _, s := range strings.Split(v.Stem, " ") {
 				if len(s) != 0 {
 					qwords_stemmed = append(qwords_stemmed, s)
@@ -219,6 +239,8 @@ func main() {
 			})
 			return
 		}
+
+		fmt.Printf("%+v -> %+v\n", mreq, res)
 
 		high := func(content []string) ([]string) {
 			type chunk struct {
