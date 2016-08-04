@@ -181,19 +181,24 @@ func main() {
 		mreq.Mbox = req.Mbox
 		mreq.Paging = req.Paging
 		mreq.Query = make(map[string]string)
-		mreq.Exact = req.Exact
+		mreq.Exact = make(map[string]string)
 		mreq.Negation = make(map[string]string)
 
 		negation_prefix := "negation_"
+		exact_prefix := "exact_"
 
 		wr := warp.CreateRequest()
 		for k, v := range req.Query {
 			wr.Insert(k, v)
 		}
+		for k, v := range req.Exact {
+			wr.Insert(exact_prefix + k, v)
+		}
 		for k, v := range req.Negation {
 			wr.Insert(negation_prefix + k, v)
 		}
 		wr.WantStem = true
+		wr.WantUrls = true
 
 		wresp, err := lp.Convert(wr)
 		if err != nil {
@@ -216,6 +221,9 @@ func main() {
 			if strings.HasPrefix(k, negation_prefix) {
 				k = strings.TrimPrefix(k, negation_prefix)
 				mreq.Negation[k] = v.Stem
+			} else if strings.HasPrefix(k, exact_prefix) {
+				k = strings.TrimPrefix(k, exact_prefix)
+				mreq.Exact[k] = v.Text
 			} else {
 				mreq.Query[k] = v.Stem
 			}
@@ -325,10 +333,10 @@ func main() {
 		clientIP := c.ClientIP()
 		xreq := c.Request.Header.Get(middleware.XRequestHeader)
 
-		glog.Infof("search: xreq: %s, client: %s, request: %+v, latencies: prepare: %s, search: %s, postprocessing: %s",
+		glog.Infof("search: xreq: %s, client: %s, warp: request: %+v -> %+v, latencies: prepare: %s, search: %s, postprocessing: %s",
 			xreq,
 			clientIP,
-			mreq,
+			req, mreq,
 			search_start_time.Sub(start_time).String(),
 			postprocessing_start_time.Sub(search_start_time).String(),
 			completion_time.Sub(postprocessing_start_time),
