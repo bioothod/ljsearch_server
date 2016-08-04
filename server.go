@@ -291,7 +291,6 @@ func main() {
 				}
 			}
 
-			total_len := 0
 			ret := make([]string, 0, len(indexes))
 			for _, ch := range indexes {
 				for idx := ch.start; idx < ch.end; idx++ {
@@ -304,13 +303,9 @@ func main() {
 					}
 
 					ret = append(ret, t)
-					total_len += len(t)
 				}
 
 				ret = append(ret, "...")
-				if total_len > 256 {
-					break
-				}
 			}
 
 			return ret
