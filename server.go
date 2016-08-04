@@ -240,8 +240,6 @@ func main() {
 			return
 		}
 
-		fmt.Printf("%+v -> %+v\n", mreq, res)
-
 		high := func(content []string) ([]string) {
 			type chunk struct {
 				start, end int
