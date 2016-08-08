@@ -26,7 +26,7 @@ type Page struct {
 
 type Document struct {
 	Id		string				`json:"id"`
-	IndexedId	int64				`json:"indexed_id"`
+	IndexedId	string				`json:"indexed_id"`
 	Author		string				`json:"author"`
 	Title		string				`json:"title"`
 	Content		Page				`json:"content"`
@@ -75,13 +75,18 @@ func (d *Document) UnmarshalJSON(data []byte) (err error) {
 type SearchResults struct {
 	Mbox		string				`json:"mailbox"`
 	Completed	bool				`json:"completed"`
-	NextDocumentId	int64				`json:"next_document_id"`
+	NextDocumentId	string				`json:"next_document_id"`
 	Docs		[]Document			`json:"ids"`
 }
 
 type Paging struct {
 	MaxNumber	int64				`json:"max_number"`
-	NextDocumentId	int64				`json:"next_document_id"`
+	NextDocumentId	string				`json:"next_document_id"`
+}
+
+type TimeRange struct {
+	Start		int64				`json:"start"`
+	End		int64				`json:"end"`
 }
 
 type SearchRequest struct {
@@ -89,6 +94,7 @@ type SearchRequest struct {
 	Exact		map[string]string		`json:"exact"`
 	Negation	map[string]string		`json:"negation"`
 	Query		map[string]string		`json:"query"`
+	Time		TimeRange			`json:"time"`
 	Paging		Paging				`json:"paging"`
 }
 
@@ -180,6 +186,7 @@ func main() {
 		var mreq SearchRequest
 		mreq.Mbox = req.Mbox
 		mreq.Paging = req.Paging
+		mreq.Time = req.Time
 		mreq.Query = make(map[string]string)
 		mreq.Exact = make(map[string]string)
 		mreq.Negation = make(map[string]string)
