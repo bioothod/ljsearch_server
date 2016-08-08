@@ -22,6 +22,8 @@ RUN	git config --global user.email "zbr@ioremap.net" && \
 	export GOPATH=/root/awork/go && \
 	mkdir -p ${GOPATH} && \
 	rm -rf ${GOPATH}/pkg/* && \
+	rm -rf ${GOPATH}/src/github.com/reverbrain/warp && \
+	go get github.com/reverbrain/warp/bindings/go/warp && \
 	rm -rf ${GOPATH}/src/github.com/bioothod/ljsearch_server && \
 	go get github.com/bioothod/ljsearch_server && \
 	cd ${GOPATH}/src/github.com/bioothod/ljsearch_server && \
