@@ -89,11 +89,14 @@ type TimeRange struct {
 	End		int64				`json:"end"`
 }
 
-type SearchRequest struct {
-	Mbox		string				`json:"mailbox"`
+type MailboxQuery struct {
 	Exact		map[string]string		`json:"exact"`
 	Negation	map[string]string		`json:"negation"`
 	Query		map[string]string		`json:"query"`
+}
+
+type SearchRequest struct {
+	MQuery		map[string]MailboxQuery		`json:"request"`
 	Time		TimeRange			`json:"time"`
 	Paging		Paging				`json:"paging"`
 }
@@ -171,7 +174,7 @@ func main() {
 		var req SearchRequest
 		err := c.BindJSON(&req)
 		if err != nil {
-			estr := fmt.Sprintf("cound not parse search request: %v", err)
+			estr := fmt.Sprintf("could not parse search request: %v", err)
 			common.NewErrorString(c, "search", estr)
 
 			c.JSON(http.StatusBadRequest, gin.H {
@@ -184,28 +187,29 @@ func main() {
 		qwords_stemmed := make([]string, 0)
 
 		var mreq SearchRequest
-		mreq.Mbox = req.Mbox
 		mreq.Paging = req.Paging
 		mreq.Time = req.Time
-		mreq.Query = make(map[string]string)
-		mreq.Exact = make(map[string]string)
-		mreq.Negation = make(map[string]string)
+		mreq.MQuery = make(map[string]MailboxQuery)
 
 		negation_prefix := "negation_"
 		exact_prefix := "exact_"
 
 		wr := warp.CreateRequest()
-		for k, v := range req.Query {
-			wr.Insert(k, v)
-		}
-		for k, v := range req.Exact {
-			wr.Insert(exact_prefix + k, v)
-		}
-		for k, v := range req.Negation {
-			wr.Insert(negation_prefix + k, v)
-		}
 		wr.WantStem = true
 		wr.WantUrls = true
+
+		for mbox, q := range req.MQuery {
+			for k, v := range q.Query {
+				wr.Insert(mbox + "|" + k, v)
+			}
+			for k, v := range q.Exact {
+				wr.Insert(mbox + "|" + exact_prefix + k, v)
+			}
+			for k, v := range q.Negation {
+				wr.Insert(mbox + "|" + negation_prefix + k, v)
+			}
+		}
+
 
 		wresp, err := lp.Convert(wr)
 		if err != nil {
@@ -220,32 +224,58 @@ func main() {
 		}
 
 		for k, v := range wresp.Result {
-			if k == "urls" {
-				mreq.Query[k] = v.Text
-				continue
+			kv := strings.SplitN(k, "|", 2)
+			if len(kv) != 2 {
+				estr := fmt.Sprintf("warp failed: returned key doesn't have mbox separator: '%s'", k)
+				common.NewErrorString(c, "search", estr)
+
+				c.JSON(http.StatusBadRequest, gin.H {
+					"operation": "search",
+					"error": estr,
+				})
+				return
 			}
 
-			if strings.HasPrefix(k, negation_prefix) {
-				k = strings.TrimPrefix(k, negation_prefix)
-				mreq.Negation[k] = v.Stem
-			} else if strings.HasPrefix(k, exact_prefix) {
-				k = strings.TrimPrefix(k, exact_prefix)
-				mreq.Exact[k] = v.Text
-			} else {
-				mreq.Query[k] = v.Stem
-			}
+			mbox := kv[0]
+			key := kv[1]
 
-			for _, s := range strings.Split(v.Stem, " ") {
-				if len(s) != 0 {
-					qwords_stemmed = append(qwords_stemmed, s)
+
+			mq, ok := mreq.MQuery[mbox]
+			if !ok {
+				mq = MailboxQuery {
+					Exact: make(map[string]string),
+					Negation: make(map[string]string),
+					Query: make(map[string]string),
 				}
 			}
+
+			if key == "urls" {
+				mq.Query[key] = v.Text
+			} else {
+				if strings.HasPrefix(key, negation_prefix) {
+					key = strings.TrimPrefix(key, negation_prefix)
+					mq.Negation[key] = v.Stem
+				} else if strings.HasPrefix(key, exact_prefix) {
+					key = strings.TrimPrefix(key, exact_prefix)
+					mq.Exact[key] = v.Text
+				} else {
+					mq.Query[key] = v.Stem
+				}
+
+				for _, s := range strings.Split(v.Stem, " ") {
+					if len(s) != 0 {
+						qwords_stemmed = append(qwords_stemmed, s)
+					}
+				}
+			}
+
+			mreq.MQuery[mbox] = mq
 		}
 
 		search_start_time := time.Now()
 		res, err := searcher.Search(&mreq)
 		if err != nil {
-			estr := fmt.Sprintf("search failed: %v", err)
+			estr := fmt.Sprintf("search failed: req: %+v -> %+v, error: %v", req, mreq, err)
 			common.NewErrorString(c, "search", estr)
 
 			c.JSON(http.StatusInternalServerError, gin.H {
