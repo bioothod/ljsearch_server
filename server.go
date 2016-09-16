@@ -18,8 +18,8 @@ import (
 )
 
 type Page struct {
-	Content		[]string		`json:"content"`
-	Title		[]string		`json:"title"`
+	Content		string			`json:"content"`
+	Title		string			`json:"title"`
 	Links		[]string		`json:"links"`
 	Images		[]string		`json:"images"`
 }
@@ -285,93 +285,17 @@ func main() {
 			return
 		}
 
-		high := func(content []string) ([]string) {
-			type chunk struct {
-				start, end int
-				high []int
-			}
-			last_indexed_end := -1
-			off := 5
-
-			indexes := make(map[int]*chunk)
-			for idx, w := range content {
-				for _, q := range qwords_stemmed {
-					if !strings.HasPrefix(w, q) {
-						continue
-					}
-
-					start := idx - off
-					if start < 0 {
-						start = 0
-					}
-
-					end := idx + off
-					if end > len(content) {
-						end = len(content)
-					}
-
-					if len(indexes) > 0 && start <= last_indexed_end {
-						ch := indexes[len(indexes) - 1]
-						ch.end = end
-						ch.high = append(ch.high, idx)
-					} else {
-						ch := &chunk {
-							start: start,
-							end: end,
-							high: []int{idx},
-						}
-
-						indexes[len(indexes)] = ch
-					}
-
-					last_indexed_end = end
-				}
-			}
-
-			ret := make([]string, 0, len(indexes))
-			for _, ch := range indexes {
-				for idx := ch.start; idx < ch.end; idx++ {
-					t := content[idx]
-					for _, h := range ch.high {
-						if idx == h {
-							t = "<high>" + t + "</high>"
-							break
-						}
-					}
-
-					ret = append(ret, t)
-				}
-
-				ret = append(ret, "...")
-			}
-
-			return ret
-		}
-
-		postprocessing_start_time := time.Now()
-		docs := make([]Document, 0, len(res.Docs))
-		for _, doc := range res.Docs {
-			doc.Title = strings.Join(doc.Content.Title, " ")
-			doc.Content.Content = high(doc.Content.Content)
-			doc.Content.Title = high(doc.Content.Title)
-
-			docs = append(docs, doc)
-		}
-
-		res.Docs = docs
-
 		completion_time := time.Now()
 
 		clientIP := c.ClientIP()
 		xreq := c.Request.Header.Get(middleware.XRequestHeader)
 
-		glog.Infof("search: xreq: %s, client: %s, warp: request: %+v -> %+v, latencies: prepare: %s, search: %s, postprocessing: %s",
+		glog.Infof("search: xreq: %s, client: %s, warp: request: %+v -> %+v, latencies: prepare: %s, search: %s",
 			xreq,
 			clientIP,
 			req, mreq,
 			search_start_time.Sub(start_time).String(),
-			postprocessing_start_time.Sub(search_start_time).String(),
-			completion_time.Sub(postprocessing_start_time),
+			completion_time.Sub(search_start_time),
 		)
 
 
